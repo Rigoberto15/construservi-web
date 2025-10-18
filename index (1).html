@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Construservi Web — Gestión de Obras</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<style>
+  :root{--bg:#f7fafc;--card:#ffffff;--muted:#6b7280;--accent:#0f172a;--primary:#0ea5a4;--primary-2:#0369a1}
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:var(--bg);color:var(--accent);-webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(90deg,var(--primary), var(--primary-2));color:white;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;letter-spacing:0.2px}
+  header p{margin:0;font-size:13px;opacity:0.95}
+  .container{max-width:1100px;margin:20px auto;padding:0 16px}
+  .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+  .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+  .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+  .btn.secondary{background:#eef2f7;color:var(--accent);font-weight:600;border:1px solid #e2e8f0}
+  .projects-list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .project-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:8px;border:1px solid #eef2f7;background:linear-gradient(180deg,#fff,#fbfdff)}
+  .small{font-size:13px;color:var(--muted)}
+  input,select,textarea{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #e6eef6;box-sizing:border-box;font-size:14px}
+  label{font-weight:700;font-size:13px;display:block;margin-top:10px;color:#15233c}
+  .list{max-height:360px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .row{display:flex;gap:10px}
+  .col{flex:1}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid #f1f5f9}
+  .muted{color:var(--muted)}
+  footer{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+  .pill{background:#f1f5f9;border-radius:999px;padding:6px 10px;font-weight:700;font-size:12px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr} header{flex-direction:column;align-items:flex-start} .container{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Construservi Web</h1>
+    <p style="margin-top:6px">Gestión de obras — Desarrollado por Rigoberto Avalos</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn" id="new-project-btn">+ Nuevo proyecto</button>
+    <button class="btn secondary" id="reset-btn" title="Eliminar todos los datos locales">Reset</button>
+    <button class="btn" id="export-btn" title="Exportar tablas a CSV">Exportar CSV</button>
+    <label for="import-file" class="btn secondary" style="padding:6px 10px;cursor:pointer;margin-left:6px">Importar CSV</label>
+    <input id="import-file" type="file" accept=".csv" style="display:none" />
+  </div>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h3 style="margin:0">Proyectos</h3>
+        <p class="small" style="margin-top:6px">Lista de proyectos. Seleccioná uno para ver detalles y gestionar la obra.</p>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <div class="pill" id="total-projects">Proyectos: 0</div>
+          <div class="small" id="global-spent">Gastado: ₲ 0</div>
+          <div class="small" id="global-budget">Presupuesto total: ₲ 0</div>
+        </div>
+        <div class="projects-list" id="projects-list"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3 style="margin:0">Crear / Editar proyecto</h3>
+        <div id="project-form">
+          <input type="hidden" id="project-id" />
+          <label>Nombre</label><input id="project-name" placeholder="Nombre del proyecto" />
+          <label>Cliente</label><input id="project-client" placeholder="Cliente" />
+          <label>Dirección</label><input id="project-address" placeholder="Dirección" />
+          <div class="row">
+            <div class="col"><label>Fecha inicio</label><input id="project-start" type="date" /></div>
+            <div class="col"><label>Fecha estimada fin</label><input id="project-end" type="date" /></div>
+          </div>
+          <label>Presupuesto total (₲)</label><input id="project-budget" type="number" min="0" step="1" placeholder="Ej: 1500000" />
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn" id="save-project">Guardar</button>
+            <button class="btn secondary" id="clear-project">Limpiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" id="project-details-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h3 id="detail-name" style="margin:0"></h3>
+            <div class="small" id="detail-client"></div>
+          </div>
+          <div style="text-align:right">
+            <div class="small">Estado: <strong id="detail-status">Activo</strong></div>
+            <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn" id="finalize-project-btn">Finalizar</button>
+              <button class="btn secondary" id="delete-project-btn">Eliminar</button>
+            </div>
+          </div>
+        </div>
+
+        <hr style="margin:10px 0" />
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="small card" id="summary-card">
+            <div><strong>Total sueldos:</strong> <span id="sum-salaries">₲ 0</span></div>
+            <div><strong>Total materiales:</strong> <span id="sum-materials">₲ 0</span></div>
+            <div><strong>Gastos extras:</strong> <span id="sum-expenses">₲ 0</span></div>
+            <div style="margin-top:8px"><strong>Total gastado:</strong> <span id="total-spent">₲ 0</span></div>
+            <div><strong>Saldo restante:</strong> <span id="remaining-budget">₲ 0</span></div>
+            <div style="margin-top:6px" id="budget-alert" class="small muted"></div>
+          </div>
+
+          <div class="card" style="padding:10px">
+            <strong>Acciones</strong>
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn" id="add-worker-btn">+ Trabajador</button>
+              <button class="btn" id="add-material-btn">+ Material</button>
+              <button class="btn" id="add-expense-btn">+ Gasto</button>
+              <button class="btn" id="add-day-btn">+ Jornada</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn secondary" id="show-workers">Personal</button>
+            <button class="btn secondary" id="show-materials">Materiales</button>
+            <button class="btn secondary" id="show-expenses">Gastos</button>
+            <button class="btn secondary" id="show-days">Días</button>
+            <button class="btn secondary" id="show-report">Reporte</button>
+          </div>
+
+          <div id="section-area" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="card" id="no-project-card">
+        <h3>Sin proyecto seleccionado</h3>
+        <p class="small">Crea o selecciona un proyecto para ver sus detalles y gestionar personal, materiales, días y gastos.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>Construservi Web — Datos guardados localmente en tu navegador. Compartí este archivo o súbelo a un hosting para que cualquiera con el link lo use.</footer>
+
+<!-- Modales simples -->
+<div id="modal-root"></div>
+
+<script>
+// --- CONSTANTES Y ALMACENAMIENTO ---
+const STORAGE_KEY = "construservi_v2";
+function loadState(){ try{ const raw = localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw) : {projects:[], workers:[], materials:[], days:[], expenses:[]}; } catch(e){ console.error(e); return {projects:[], workers:[], materials:[], days:[], expenses:[]}; } }
+function saveState(state){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+let state = loadState();
+
+// --- HELPERS ---
+const $ = id => document.getElementById(id);
+function uid(prefix='id'){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+// Formatea números a Guaraníes con separador de miles y símbolo ₲
+function money(v){
+  const n = Number(v || 0);
+  try {
+    return n.toLocaleString('es-PY', { style: 'currency', currency: 'PYG', maximumFractionDigits: 0 });
+  } catch(e){
+    // fallback simple: separador de miles y prefijo ₲
+    return '₲ ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  }
+}
+function num(v){ return Number(v || 0); }
+
+// --- RENDER PROYECTOS ---
+function renderProjects(){
+  const el = $('projects-list'); el.innerHTML='';
+  state.projects.sort((a,b)=> (a.status===b.status)? (a.name>b.name?1:-1) : (a.status==='Finalizado'?1:-1));
+  state.projects.forEach(p=>{
+    const div = document.createElement('div'); div.className='project-item';
+    div.innerHTML = `<div style="max-width:70%">
+      <strong>${escapeHtml(p.name)}</strong><div class="small">${escapeHtml(p.client || '')}</div>
+      <div class="small muted">${escapeHtml(p.address || '')}</div>
+    </div>
+    <div style="text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <div class="small">Gastado: ${money(calcProjectTotalSpent(p.project_id))}</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn secondary" onclick="selectProject('${p.project_id}')">Abrir</button>
+        <button class="btn" onclick="selectProject('${p.project_id}')">Abrir</button>
+        <button class="btn secondary" style="background:#fee2e2;color:#9b1c1c;border:1px solid #fecaca" onclick="deleteProject('${p.project_id}')">Eliminar</button>
+      </div>
+    </div>`;
+    el.appendChild(div);
+  });
+  $('total-projects').textContent = 'Proyectos: ' + state.projects.length;
+  const globalSpent = state.projects.reduce((s,p)=> s + calcProjectTotalSpent(p.project_id), 0);
+  const globalBudget = state.projects.reduce((s,p)=> s + num(p.budget_total), 0);
+  $('global-spent').textContent = 'Gastado: ' + money(globalSpent);
+  $('global-budget').textContent = 'Presupuesto total: ' + money(globalBudget);
+}
+
+// --- ESCAPAR HTML para seguridad XSS local ---
+function escapeHtml(str){ return String(str||'').replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+
+// --- CRUD PROYECTOS ---
+function saveProjectFromForm(){
+  const id = $('project-id').value || uid('proj');
+  const existing = state.projects.find(x=>x.project_id===id);
+  const obj = {
+    project_id: id,
+    name: $('project-name').value.trim() || 'Nuevo proyecto',
+    client: $('project-client').value.trim() || '',
+    address: $('project-address').value.trim() || '',
+    start_date: $('project-start').value || '',
+    end_date: $('project-end').value || '',
+    budget_total: Math.round(num($('project-budget').value || 0)),
+    status: existing? existing.status : 'Activo'
+  };
+  if(existing){ Object.assign(existing, obj); } else { state.projects.push(obj); }
+  saveState(state); renderProjects(); selectProject(id); clearProjectForm();
+}
+
+function clearProjectForm(){ $('project-id').value=''; $('project-name').value=''; $('project-client').value=''; $('project-address').value=''; $('project-start').value=''; $('project-end').value=''; $('project-budget').value=''; }
+
+function selectProject(id){
+  const p = state.projects.find(x=>x.project_id===id); if(!p) return alert('Proyecto no encontrado');
+  $('no-project-card').style.display='none'; $('project-details-card').style.display='block';
+  $('detail-name').textContent = p.name; $('detail-client').textContent = (p.client || '') + (p.address? ' — ' + p.address : '');
+  $('detail-status').textContent = p.status;
+  currentProjectId = id;
+  renderSummary(id);
+  showSection('report');
+}
+
+// --- Eliminar proyecto ---
+function deleteProject(id){
+  if(!confirm('Eliminar proyecto y todos sus datos asociados?')) return;
+  state.projects = state.projects.filter(p=>p.project_id!==id);
+  // eliminar asociados
+  state.workers = state.workers.filter(w=>w.project_id!==id);
+  state.materials = state.materials.filter(m=>m.project_id!==id);
+  state.days = state.days.filter(d=>d.project_id!==id);
+  state.expenses = state.expenses.filter(e=>e.project_id!==id);
+  saveState(state); renderProjects();
+  // si estaba seleccionado, ocultar detalle
+  if(currentProjectId===id){ currentProjectId=null; $('project-details-card').style.display='none'; $('no-project-card').style.display='block'; }
+}
+
+// --- CÁLCULOS ---
+function calcProjectMaterials(project_id){
+  return state.materials.filter(m=>m.project_id===project_id).reduce((s,m)=>s + num(m.quantity)*num(m.unit_price),0);
+}
+function calcProjectExpenses(project_id){
+  return state.expenses.filter(e=>e.project_id===project_id).reduce((s,e)=>s+num(e.amount),0);
+}
+function calcProjectSalaries(project_id){
+  return state.days.filter(d=>d.project_id===project_id && d.status==='worked').reduce((s,d)=>{
+    const w = state.workers.find(w=>w.worker_id===d.worker_id);
+    return s + (w? num(w.daily_wage) : 0);
+  },0);
+}
+function calcProjectTotalSpent(project_id){
+  return calcProjectMaterials(project_id) + calcProjectExpenses(project_id) + calcProjectSalaries(project_id);
+}
+
+// --- RENDER RESUMEN ---
+function renderSummary(project_id){
+  const sumMat = calcProjectMaterials(project_id);
+  const sumExp = calcProjectExpenses(project_id);
+  const sumSal = calcProjectSalaries(project_id);
+  const total = sumMat+sumExp+sumSal;
+  const proj = state.projects.find(p=>p.project_id===project_id) || {budget_total:0};
+  const remaining = proj.budget_total - total;
+  $('sum-materials').textContent = money(sumMat);
+  $('sum-expenses').textContent = money(sumExp);
+  $('sum-salaries').textContent = money(sumSal);
+  $('total-spent').textContent = money(total);
+  $('remaining-budget').textContent = money(remaining);
+  const alert = $('budget-alert');
+  if(remaining < 0) alert.textContent = '¡Presupuesto excedido!';
+  else if(remaining < proj.budget_total*0.1) alert.textContent = 'Presupuesto en riesgo (menos del 10% restante)';
+  else alert.textContent = '';
+}
+
+// --- VISTAS DE SECCIÓN ---
+let currentProjectId = null;
+function showSection(name){
+  const area = $('section-area'); area.innerHTML='';
+  if(!currentProjectId) return;
+  if(name==='workers'){
+    const list = state.workers.filter(w=>w.project_id===currentProjectId);
+    const html = document.createElement('div');
+    html.innerHTML = `<h4>Personal</h4><div class="list"></div>`;
+    const listEl = html.querySelector('.list');
+    list.forEach(w=>{
+      const d = document.createElement('div'); d.className='project-item';
+      d.innerHTML = `<div><strong>${escapeHtml(w.name)}</strong><div class="small">${escapeHtml(w.role)}</div></div>
+      <div style="text-align:right"><div class="small">Diario: ${money(w.daily_wage)}</div><div style="margin-top:6px">
+      <button class="btn secondary" onclick="editWorker('${w.worker_id}')">Editar</button>
+      <button class="btn" onclick="deleteWorker('${w.worker_id}')">Eliminar</button></div></div>`;
+      listEl.appendChild(d);
+    });
+    const addBtn = document.createElement('div'); addBtn.style.marginTop='8px';
+    addBtn.innerHTML = `<button class="btn" onclick="openWorkerModal()">Agregar trabajador</button>`;
+    html.appendChild(addBtn);
+    area.appendChild(html);
+  } else if(name==='materials'){
+    const list = state.materials.filter(m=>m.project_id===currentProjectId);
+    const table = document.createElement('div');
+    table.innerHTML = `<h4>Materiales</h4><table><thead><tr><th>Nombre</th><th>Cant.</th><th>Precio u.</th><th>Total</th><th></th></tr></thead><tbody></tbody></table>`;
+    const tbody = table.querySelector('tbody');
+    list.forEach(m=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(m.name)}</td><td>${m.quantity} ${escapeHtml(m.unit||'')}</td><td>${money(m.unit_price)}</td><td>${money(num(m.quantity)*num(m.unit_price))}</td>
+      <td><button class="btn secondary" onclick="editMaterial('${m.material_id}')">Editar</button> <button class="btn" onclick="deleteMaterial('${m.material_id}')">Eliminar</button></td>`;
+      tbody.appendChild(tr);
+    });
+    const addBtn = document.createElement('div'); addBtn.style.marginTop='8px'; addBtn.innerHTML = `<button class="btn" onclick="openMaterialModal()">Agregar material</button>`;
+    area.appendChild(table); area.appendChild(addBtn);
+  } else if(name==='expenses'){
+    const list = state.expenses.filter(e=>e.project_id===currentProjectId);
+    const table = document.createElement('div');
+    table.innerHTML = `<h4>Gastos</h4><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th></th></tr></thead><tbody></tbody></table>`;
+    const tbody = table.querySelector('tbody');
+    list.forEach(e=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(e.date || '')}</td><td>${escapeHtml(e.description)}</td><td>${money(e.amount)}</td><td><button class="btn secondary" onclick="editExpense('${e.expense_id}')">Editar</button> <button class="btn" onclick="deleteExpense('${e.expense_id}')">Eliminar</button></td>`;
+      tbody.appendChild(tr);
+    });
+    const addBtn = document.createElement('div'); addBtn.style.marginTop='8px'; addBtn.innerHTML = `<button class="btn" onclick="openExpenseModal()">Agregar gasto</button>`;
+    area.appendChild(table); area.appendChild(addBtn);
+  } else if(name==='days'){
+    const list = state.days.filter(d=>d.project_id===currentProjectId);
+    const table = document.createElement('div');
+    table.innerHTML = `<h4>Días laborales</h4><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Estado</th><th></th></tr></thead><tbody></tbody></table>`;
+    const tbody = table.querySelector('tbody');
+    list.forEach(d=>{
+      const w = state.workers.find(w=>w.worker_id===d.worker_id);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(d.date)}</td><td>${escapeHtml(w? w.name : '—')}</td><td>${escapeHtml(d.status)}</td><td><button class="btn secondary" onclick="deleteDay('${d.day_id}')">Eliminar</button></td>`;
+      tbody.appendChild(tr);
+    });
+    const addBtn = document.createElement('div'); addBtn.style.marginTop='8px'; addBtn.innerHTML = `<button class="btn" onclick="openDayModal()">Registrar jornada</button>`;
+    area.appendChild(table); area.appendChild(addBtn);
+  } else if(name==='report'){
+    const p = state.projects.find(p=>p.project_id===currentProjectId);
+    const report = document.createElement('div');
+    report.innerHTML = `<h4>Reporte - ${escapeHtml(p.name)}</h4>
+      <p class="small">Cliente: ${escapeHtml(p.client || '')} — Dirección: ${escapeHtml(p.address || '')}</p>
+      <table><tbody>
+        <tr><td>Total sueldos</td><td>${money(calcProjectSalaries(currentProjectId))}</td></tr>
+        <tr><td>Total materiales</td><td>${money(calcProjectMaterials(currentProjectId))}</td></tr>
+        <tr><td>Gastos extras</td><td>${money(calcProjectExpenses(currentProjectId))}</td></tr>
+        <tr><td><strong>Total gastado</strong></td><td><strong>${money(calcProjectTotalSpent(currentProjectId))}</strong></td></tr>
+        <tr><td>Presupuesto</td><td>${money(p.budget_total)}</td></tr>
+        <tr><td>Saldo restante</td><td>${money(p.budget_total - calcProjectTotalSpent(currentProjectId))}</td></tr>
+      </tbody></table>`;
+    area.appendChild(report);
+  }
+}
+
+// --- MODALES Y FORMULARIOS ---
+function createModal(html){ const root = $('modal-root'); const wrap = document.createElement('div'); wrap.className='card'; wrap.style.position='fixed'; wrap.style.left='50%'; wrap.style.top='50%'; wrap.style.transform='translate(-50%,-50%)'; wrap.style.zIndex=9999; wrap.style.width='min(720px,94%)'; wrap.innerHTML = html + '<div style="margin-top:10px;text-align:right"><button class="btn secondary" onclick="closeModal()">Cerrar</button></div>'; root.appendChild(wrap); return wrap; }
+function closeModal(){ const root = $('modal-root'); root.innerHTML=''; }
+
+// WORKERS
+function openWorkerModal(editId){
+  const w = state.workers.find(x=>x.worker_id===editId) || {};
+  const html = `<h3>${editId? 'Editar' : 'Agregar'} trabajador</h3>
+    <label>Nombre</label><input id="m-worker-name" value="${escapeHtml(w.name || '')}" />
+    <label>Cargo</label><input id="m-worker-role" value="${escapeHtml(w.role || '')}" />
+    <label>Sueldo diario (₲)</label><input id="m-worker-wage" type="number" value="${w.daily_wage || 0}" />
+    <div style="margin-top:10px"><button class="btn" id="save-worker-btn">Guardar</button></div>`;
+  const modal = createModal(html);
+  modal.querySelector('#save-worker-btn').onclick = ()=>{
+    const name = modal.querySelector('#m-worker-name').value.trim();
+    if(!name) return alert('Nombre requerido');
+    const obj = {
+      worker_id: editId || uid('w'),
+      project_id: currentProjectId,
+      name,
+      role: modal.querySelector('#m-worker-role').value.trim(),
+      daily_wage: Math.round(num(modal.querySelector('#m-worker-wage').value))
+    };
+    if(editId){ const ex = state.workers.find(x=>x.worker_id===editId); Object.assign(ex,obj); } else state.workers.push(obj);
+    saveState(state); closeModal(); showSection('workers'); renderSummary(currentProjectId); renderProjects();
+  };
+}
+
+function editWorker(id){ openWorkerModal(id); }
+function deleteWorker(id){ if(!confirm('Eliminar trabajador?')) return; state.workers = state.workers.filter(w=>w.worker_id!==id); state.days = state.days.filter(d=>d.worker_id!==id); saveState(state); showSection('workers'); renderSummary(currentProjectId); renderProjects(); }
+
+// MATERIALS
+function openMaterialModal(editId){
+  const m = state.materials.find(x=>x.material_id===editId) || {};
+  const html = `<h3>${editId? 'Editar' : 'Agregar'} material</h3>
+    <label>Nombre</label><input id="m-material-name" value="${escapeHtml(m.name||'')}" />
+    <label>Unidad</label><input id="m-material-unit" value="${escapeHtml(m.unit||'')}" />
+    <div class="row"><div class="col"><label>Cantidad</label><input id="m-material-qty" type="number" value="${m.quantity||0}" /></div><div class="col"><label>Precio unitario (₲)</label><input id="m-material-price" type="number" value="${m.unit_price||0}" /></div></div>
+    <label>Proveedor</label><input id="m-material-supplier" value="${escapeHtml(m.supplier||'')}" />
+    <div style="margin-top:10px"><button class="btn" id="save-material-btn">Guardar</button></div>`;
+  const modal = createModal(html);
+  modal.querySelector('#save-material-btn').onclick = ()=>{
+    const name = modal.querySelector('#m-material-name').value.trim();
+    if(!name) return alert('Nombre requerido');
+    const obj = {
+      material_id: editId || uid('mat'),
+      project_id: currentProjectId,
+      name,
+      unit: modal.querySelector('#m-material-unit').value.trim(),
+      quantity: Math.round(num(modal.querySelector('#m-material-qty').value)),
+      unit_price: Math.round(num(modal.querySelector('#m-material-price').value)),
+      supplier: modal.querySelector('#m-material-supplier').value.trim()
+    };
+    if(editId){ const ex = state.materials.find(x=>x.material_id===editId); Object.assign(ex,obj); } else state.materials.push(obj);
+    saveState(state); closeModal(); showSection('materials'); renderSummary(currentProjectId); renderProjects();
+  };
+}
+
+function editMaterial(id){ openMaterialModal(id); }
+function deleteMaterial(id){ if(!confirm('Eliminar material?')) return; state.materials = state.materials.filter(x=>x.material_id!==id); saveState(state); showSection('materials'); renderSummary(currentProjectId); renderProjects(); }
+
+// EXPENSES
+function openExpenseModal(editId){
+  const e = state.expenses.find(x=>x.expense_id===editId) || {};
+  const html = `<h3>${editId? 'Editar' : 'Agregar'} gasto</h3>
+    <label>Fecha</label><input id="m-exp-date" type="date" value="${escapeHtml(e.date||'')}" />
+    <label>Descripción</label><input id="m-exp-desc" value="${escapeHtml(e.description||'')}" />
+    <label>Monto (₲)</label><input id="m-exp-amt" type="number" value="${e.amount||0}" />
+    <label>Categoría</label><input id="m-exp-cat" value="${escapeHtml(e.category||'')}" />
+    <div style="margin-top:10px"><button class="btn" id="save-exp-btn">Guardar</button></div>`;
+  const modal = createModal(html);
+  modal.querySelector('#save-exp-btn').onclick = ()=>{
+    const obj = {
+      expense_id: editId || uid('exp'),
+      project_id: currentProjectId,
+      date: modal.querySelector('#m-exp-date').value,
+      description: modal.querySelector('#m-exp-desc').value.trim(),
+      amount: Math.round(num(modal.querySelector('#m-exp-amt').value)),
+      category: modal.querySelector('#m-exp-cat').value.trim()
+    };
+    if(editId){ const ex = state.expenses.find(x=>x.expense_id===editId); Object.assign(ex,obj); } else state.expenses.push(obj);
+    saveState(state); closeModal(); showSection('expenses'); renderSummary(currentProjectId); renderProjects();
+  };
+}
+
+function editExpense(id){ openExpenseModal(id); }
+function deleteExpense(id){ if(!confirm('Eliminar gasto?')) return; state.expenses = state.expenses.filter(x=>x.expense_id!==id); saveState(state); showSection('expenses'); renderSummary(currentProjectId); renderProjects(); }
+
+// DAYS
+function openDayModal(){
+  const workers = state.workers.filter(w=>w.project_id===currentProjectId);
+  if(workers.length===0) return alert('Añadí al menos un trabajador antes de registrar jornadas.');
+  let options = workers.map(w=>`<option value="${w.worker_id}">${escapeHtml(w.name)} (${escapeHtml(w.role)})</option>`).join('');
+  const html = `<h3>Registrar jornada</h3>
+    <label>Fecha</label><input id="m-day-date" type="date" value="${new Date().toISOString().slice(0,10)}" />
+    <label>Trabajador</label><select id="m-day-worker">${options}</select>
+    <label>Estado</label><select id="m-day-status"><option value="worked">Trabajado</option><option value="suspended">Suspendido</option></select>
+    <div style="margin-top:10px"><button class="btn" id="save-day-btn">Guardar jornada</button></div>`;
+  const modal = createModal(html);
+  modal.querySelector('#save-day-btn').onclick = ()=>{
+    const obj = {
+      day_id: uid('day'),
+      project_id: currentProjectId,
+      date: modal.querySelector('#m-day-date').value,
+      worker_id: modal.querySelector('#m-day-worker').value,
+      status: modal.querySelector('#m-day-status').value
+    };
+    state.days.push(obj);
+    saveState(state); closeModal(); showSection('days'); renderSummary(currentProjectId); renderProjects();
+  };
+}
+
+function deleteDay(id){ if(!confirm('Eliminar jornada?')) return; state.days = state.days.filter(d=>d.day_id!==id); saveState(state); showSection('days'); renderSummary(currentProjectId); renderProjects(); }
+
+// FINALIZAR PROYECTO
+function finalizeProject(){
+  if(!confirm('Finalizar proyecto? No podrás editarlo fácilmente después.')) return;
+  const p = state.projects.find(p=>p.project_id===currentProjectId);
+  if(p) p.status = 'Finalizado';
+  saveState(state); renderProjects(); selectProject(currentProjectId);
+}
+
+// --- INICIALIZACIÓN Y EVENTOS ---
+document.getElementById('save-project').onclick = saveProjectFromForm;
+document.getElementById('clear-project').onclick = clearProjectForm;
+document.getElementById('new-project-btn').onclick = ()=>{ clearProjectForm(); window.scrollTo({top:0,behavior:"smooth"}); };
+document.getElementById('reset-btn').onclick = ()=>{ if(confirm('Eliminar todos los datos locales?')){ localStorage.removeItem(STORAGE_KEY); state = {projects:[], workers:[], materials:[], days:[], expenses:[]}; renderProjects(); closeModal(); $('no-project-card').style.display='block'; $('project-details-card').style.display='none'; }};
+window.selectProject = selectProject;
+window.openWorkerModal = openWorkerModal;
+window.editWorker = editWorker;
+window.deleteWorker = deleteWorker;
+window.openMaterialModal = openMaterialModal;
+window.editMaterial = editMaterial;
+window.deleteMaterial = deleteMaterial;
+window.openExpenseModal = openExpenseModal;
+window.editExpense = editExpense;
+window.deleteExpense = deleteExpense;
+window.openDayModal = openDayModal;
+window.deleteDay = deleteDay;
+document.getElementById('add-worker-btn').onclick = ()=>{ if(!currentProjectId) return alert('Seleccioná un proyecto'); openWorkerModal(); };
+document.getElementById('add-material-btn').onclick = ()=>{ if(!currentProjectId) return alert('Seleccioná un proyecto'); openMaterialModal(); };
+document.getElementById('add-expense-btn').onclick = ()=>{ if(!currentProjectId) return alert('Seleccioná un proyecto'); openExpenseModal(); };
+document.getElementById('add-day-btn').onclick = ()=>{ if(!currentProjectId) return alert('Seleccioná un proyecto'); openDayModal(); };
+document.getElementById('show-workers').onclick = ()=>showSection('workers');
+document.getElementById('show-materials').onclick = ()=>showSection('materials');
+document.getElementById('show-expenses').onclick = ()=>showSection('expenses');
+document.getElementById('show-days').onclick = ()=>showSection('days');
+document.getElementById('show-report').onclick = ()=>showSection('report');
+document.getElementById('delete-project-btn').onclick = ()=>{ if(currentProjectId) deleteProject(currentProjectId); };
+document.getElementById('finalize-project-btn').onclick = finalizeProject;
+
+// render inicial
+renderProjects();
+
+
+// --- EXPORTAR / IMPORTAR CSV ---
+// Convierte una tabla (array de objetos) a CSV y descarga
+function downloadCSV(filename, rows){
+  if(!rows || !rows.length){
+    alert('No hay datos para exportar: ' + filename);
+    return;
+  }
+  const keys = Object.keys(rows[0]);
+  const lines = [keys.join(',')];
+  for(const r of rows){
+    const vals = keys.map(k => {
+      const v = r[k]===null || r[k]===undefined ? '' : String(r[k]);
+      // escape double quotes
+      return '"' + v.replace(/"/g,'""') + '"';
+    });
+    lines.push(vals.join(','));
+  }
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Exportar todas las tablas como CSV individuales
+function exportAllCSV(){
+  downloadCSV('projects.csv', state.projects);
+  downloadCSV('workers.csv', state.workers);
+  downloadCSV('materials.csv', state.materials);
+  downloadCSV('days.csv', state.days);
+  downloadCSV('expenses.csv', state.expenses);
+  // también exportar backup en JSON
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='construservi_backup.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// Importar CSV simple: usuario selecciona qué tabla corresponde (prompt)
+// Soporta archivos con cabecera exacta de las tablas.
+// parseCSV: retorna array de objetos
+function parseCSV(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim()!==''); if(lines.length===0) return [];
+  const header = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = [];
+    let cur='', inQuotes=false;
+    const line = lines[i];
+    for(let c=0;c<line.length;c++){
+      const ch = line[c];
+      if(ch==='\"'){ if(inQuotes && line[c+1]==='\"'){ cur += '\"'; c++; } else inQuotes=!inQuotes; }
+      else if(ch===',' && !inQuotes){ cols.push(cur); cur=''; } else { cur += ch; }
+    }
+    cols.push(cur);
+    const obj = {};
+    for(let j=0;j<header.length;j++){ obj[header[j]] = cols[j]!==undefined ? cols[j].replace(/^"|"$/g,'') : ''; }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Importa un archivo CSV al estado; pregunta a qué tabla pertenece
+function importCSVFile(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+      const rows = parseCSV(text);
+      if(!rows.length) return alert('CSV vacío o formato inválido');
+      const choice = prompt('¿A qué tabla pertenece este CSV? Escribí: projects, workers, materials, days o expenses');
+      if(!choice) return;
+      const tab = choice.trim().toLowerCase();
+      if(!['projects','workers','materials','days','expenses'].includes(tab)) return alert('Tabla inválida');
+      // Convert numeric fields where applicable
+      rows.forEach(r=>{
+        if(tab==='projects'){ if(r.budget_total) r.budget_total = Math.round(Number(r.budget_total)||0); }
+        if(tab==='workers'){ if(r.daily_wage) r.daily_wage = Math.round(Number(r.daily_wage)||0); }
+        if(tab==='materials'){ if(r.quantity) r.quantity = Math.round(Number(r.quantity)||0); if(r.unit_price) r.unit_price = Math.round(Number(r.unit_price)||0); }
+        if(tab==='expenses'){ if(r.amount) r.amount = Math.round(Number(r.amount)||0); }
+      });
+      // Reemplazar o unir: preguntar
+      const mode = prompt('¿Deseás (R)eemplazar la tabla o (A)gregar al contenido existente? Escribí R o A', 'A');
+      if(mode && mode.toUpperCase()==='R') state[tab] = rows;
+      else state[tab] = state[tab].concat(rows);
+      saveState(state); renderProjects();
+      if(currentProjectId) renderSummary(currentProjectId);
+      alert('Importación exitosa a ' + tab);
+    } catch(err){ console.error(err); alert('Error al importar CSV'); }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// Eventos para botones export/import
+document.getElementById('export-btn').onclick = exportAllCSV;
+document.getElementById('import-file').addEventListener('change', function(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  importCSVFile(f);
+  this.value = '';
+});
+
+</script>
+</body>
+</html>
